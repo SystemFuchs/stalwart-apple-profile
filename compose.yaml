@@ -1,0 +1,25 @@
+services:
+  apple-profile:
+    build: .
+    image: apple-profile:local
+    container_name: apple-profile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Time zone for log timestamps and the app password description
+      TZ: ${TZ:-UTC}
+    ports:
+      - "127.0.0.1:8087:8080"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 128m
+    tmpfs:
+      - /tmp:size=8m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
