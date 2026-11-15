@@ -996,10 +996,11 @@ class Handler(BaseHTTPRequestHandler):
             raise ServiceError("err_bad_state", 400)
 
         # RFC 9207: the issuer in the callback must match our authorization server.
-        # A mismatch indicates a mix-up attack, so refuse rather than continue.
+        # Stalwart >= 1.1 always sends it. A missing or different issuer indicates a
+        # mix-up attack, so refuse rather than continue.
         iss = query.get("iss", [""])[0]
-        if iss and iss.rstrip("/") != STALWART_URL:
-            log.warning("issuer mismatch: callback iss=%s expected=%s", iss, STALWART_URL)
+        if iss.rstrip("/") != STALWART_URL:
+            log.warning("issuer mismatch: callback iss=%s expected=%s", iss or "(missing)", STALWART_URL)
             raise ServiceError("err_bad_iss", 400)
 
         only_email = bool(payload.get("e"))
