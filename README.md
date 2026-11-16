@@ -13,7 +13,48 @@ Apple profiles.
 - Runs as a hardened container behind your reverse proxy
 - Web pages in English and German (picked from the browser language)
 
-## Requirements
+**Who does what:** an administrator of the Stalwart server sets this service up once
+(OAuth client, container, reverse proxy). Users only open a web page and install the profile;
+they need no admin rights, scripts or command line.
+
+- [For users](#for-users): installing the profile
+- [For administrators](#for-administrators): setup, configuration, troubleshooting
+
+## For users
+
+Your administrator gives you the address of the page, e.g. `https://profile.example.org`.
+
+### iPhone / iPad
+
+1. Open the page in **Safari**. Other browsers cannot install profiles.
+2. Choose "Mail, calendars and contacts" or "Mail only" and sign in to Stalwart.
+3. Confirm the consent screen. It names `apple-profile` and asks for full access to the
+   account. Because the service revokes its token afterwards, the screen shows up on every
+   download.
+4. Allow the profile download.
+5. Settings › "Profile Downloaded" › Install. The profile is shown as "Unverified" because it is
+   not signed.
+6. Check Mail, Calendar and Contacts. Stalwart now lists an app password
+   "Apple profile iPhone YYYY-MM-DD HH:MM".
+
+### Mac
+
+1. Open the page in Safari and sign in. The profile lands in the Downloads folder.
+2. Double-click it, then System Settings › General › Device Management (or Privacy & Security ›
+   Profiles) › Install.
+
+On an iPad the app password is named "Mac/iPad", because iPadOS Safari identifies itself as a
+Mac. Installing a new profile replaces the old one on the same device.
+
+### "App password limit reached"
+
+Each download creates a new app password, and Stalwart allows only a few per account. If the
+page says the limit is reached, follow its link to your Stalwart account page, delete old
+"Apple profile ..." app passwords of devices you no longer use, and download again.
+
+## For administrators
+
+### Requirements
 
 - **Stalwart 1.1.0 or newer.** Written against the v1.1.0 source. On 1.0.x it cannot work,
   because apps signed in via OAuth cannot create app passwords there. For 0.16.x see
@@ -23,7 +64,7 @@ Apple profiles.
 - Docker with Compose (or any way to run `python3 app.py` with Python 3.10+).
 - An admin account (superuser) in Stalwart to register the OAuth client.
 
-## How it works
+### How it works
 
 1. The user opens the page in Safari on the device and picks "Mail, calendars and contacts" or
    "Mail only".
@@ -42,9 +83,9 @@ The app password inherits the user's permissions **except** those listed in
 who gets hold of a profile cannot create further credentials or change the main password.
 JMAP (webmail) stays allowed because there is no separate permission for it.
 
-## Installation
+### Installation
 
-### 1. Register the OAuth client in Stalwart
+#### 1. Register the OAuth client in Stalwart
 
 Create an OAuth client (registry object `OAuthClient`) in the admin UI:
 
@@ -73,7 +114,7 @@ script needs `curl` and `jq`; run `./stalwart-oauth-settings.sh help` for all co
 If you upgraded from 0.16.x, an existing client has no scopes yet. Add them with
 `show` (to get the registry id) and `set-scopes <id> mail,contacts,calendars,full`.
 
-### 2. Run the container
+#### 2. Run the container
 
 ```bash
 git clone <this repository> /opt/apple-profile && cd /opt/apple-profile
@@ -92,7 +133,7 @@ stdout (`docker logs`), rotated by Docker (3 × 10 MB). Set `TZ` in `.env` for l
 
 The service listens on `127.0.0.1:8087` only. Put your reverse proxy in front of it.
 
-### 3. Reverse proxy
+#### 3. Reverse proxy
 
 **Caddy** — see `Caddyfile.example`:
 
@@ -117,31 +158,7 @@ With exactly one proxy in front, keep `TRUSTED_PROXIES=1`. The service then take
 (for rate limiting and logs) from the last `X-Forwarded-For` entry, which the proxy wrote itself.
 With two proxies in a chain set it to `2`. Without a proxy set it to `0`.
 
-## Usage
-
-### iPhone / iPad
-
-1. Open `https://profile.example.org` in **Safari**. Other browsers cannot install profiles.
-2. Choose a button and sign in to Stalwart.
-3. Confirm the consent screen. It names `apple-profile` and asks for full access to the
-   account. Because the service revokes its token afterwards, the screen shows up on every
-   download.
-4. Allow the profile download.
-5. Settings › "Profile Downloaded" › Install. The profile is shown as "Unverified" because it is
-   not signed.
-6. Check Mail, Calendar and Contacts. Stalwart now lists an app password
-   "Apple profile iPhone YYYY-MM-DD HH:MM".
-
-### Mac
-
-1. Open the page in Safari and sign in. The profile lands in the Downloads folder.
-2. Double-click it, then System Settings › General › Device Management (or Privacy & Security ›
-   Profiles) › Install.
-
-iPadOS Safari identifies itself as a Mac, so on iPads the app password is named "Mac/iPad".
-`/start?only_email=1` (the "Mail only" button) creates a profile with the mail account only.
-
-## Configuration
+### Configuration
 
 All settings are environment variables (see `.env.example`).
 
@@ -176,7 +193,7 @@ All settings are environment variables (see `.env.example`).
 Profile identifiers and UUIDs are stable per user, so installing a new profile replaces the old
 one on the device.
 
-## Limit on app passwords
+### Limit on app passwords
 
 Every download creates a new app password. Stalwart limits them per account with
 `maxAppPasswords` in the `Authentication` object (default **5**). When the limit is reached,
@@ -187,7 +204,7 @@ Old app passwords are **not** deleted automatically: the device is only roughly 
 user agent ("iPhone", "Mac/iPad"), and with two devices of the same kind a new download would
 lock out the other one. If users have several devices, raise the limit (e.g. to 20).
 
-## Troubleshooting
+### Troubleshooting
 
 Watch `docker logs -f apple-profile`. A successful download logs
 `profile issued: user=... device=... credential_id=...`.
@@ -203,7 +220,7 @@ Watch `docker logs -f apple-profile`. A successful download logs
 | Sign-in expired | Cookie missing: more than 10 minutes, or a different browser |
 | `token revocation failed` in the log | Only a warning, the profile was delivered. The grant stays in the user's connected applications |
 
-## Security considerations
+### Security considerations
 
 - **Full-access token.** Since Stalwart 1.0 an OAuth token only carries the rights of its scopes.
   When creating an app password, Stalwart checks that the token itself holds every right the app
@@ -223,7 +240,7 @@ Watch `docker logs -f apple-profile`. A successful download logs
   `OidcProvider`) is `disabled` by default. This service does not need it; with `sameDomain` or
   `any`, other `https://` client IDs can reach the consent screen.
 
-## Older Stalwart versions (0.16.x)
+### Older Stalwart versions (0.16.x)
 
 Up to and including 0.16.27, Stalwart accepts any `client_id` with any `https://` redirect URI
 while `requireClientRegistration` is `false` (the default). If you still run 0.16.x, register all
